@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     let mut stmt = conn.prepare("SELECT id, name, value FROM flags")?;
 
     let flag_iter = stmt.query_map([], |row| {
-        let value = match row.get(0)? {
+        let value = match row.get(2)? {
             1 => true,
             _ => false,
         };
