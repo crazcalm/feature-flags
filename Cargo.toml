@@ -22,7 +22,16 @@ features = ["derive"]
 version = "0.3"
 features = ["default"] 
 
+[dependencies.tokio]
+version = "1"
+features = ["full"]
 
 [dependencies.rusqlite]
 version = "0.25.1"
 features = ["bundled-full"]
+
+[dependencies.log]
+version = "0.4"
+
+[dependencies.pretty_env_logger]
+version = "0.4"
