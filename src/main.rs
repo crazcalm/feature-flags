@@ -11,21 +11,27 @@ async fn main() {
     pretty_env_logger::init();
 
     let db = models::blank_db();
+    let db_lite = models::get_db();
 
     let api = filters::todos(db);
+    let flags_api = filters::feature_flag_all_routes(db_lite);
 
     // match any request and return hello world!
     let routes = api.with(warp::log("todos"));
 
-    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+    let more_routes = routes.or(flags_api);
+
+    warp::serve(more_routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
 mod filters {
-    use std::error::Error;
+
+    use crate::handlers::{create_flag, list_flags};
 
     use super::handlers;
     use super::models::{Db, ListOptions, Todo};
-    use warp::path::Exact;
+    use super::models::{DbLite, Flag};
+    use serde::de::value::Error;
     use warp::Filter;
 
     /// All the TODOs filters combined.
@@ -36,6 +42,13 @@ mod filters {
             .or(todos_create(db.clone()))
             .or(todos_update(db.clone()))
             .or(todos_delete(db))
+    }
+
+    /// All the Feature Flag filters combined.
+    pub fn feature_flag_all_routes(
+        db: DbLite,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        feature_flag_create(db.clone()).or(flags_list(db.clone()))
     }
 
     /// GET
@@ -49,6 +62,16 @@ mod filters {
             .and_then(handlers::list_todos)
     }
 
+    /// GET flags
+    pub fn flags_list(
+        db: DbLite,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("flags")
+            .and(warp::get())
+            .and(with_db_lite(db))
+            .and_then(handlers::list_flags)
+    }
+
     /// POST
     pub fn todos_create(
         db: Db,
@@ -58,6 +81,17 @@ mod filters {
             .and(json_body())
             .and(with_db(db))
             .and_then(handlers::create_todo)
+    }
+
+    /// POST Feature Flag
+    pub fn feature_flag_create(
+        db: DbLite,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("flags")
+            .and(warp::post())
+            .and(json_flag_body())
+            .and(with_db_lite(db))
+            .and_then(handlers::create_flag)
     }
 
     /// PUT
@@ -93,7 +127,19 @@ mod filters {
         warp::any().map(move || db.clone())
     }
 
+    fn with_db_lite(
+        db: DbLite,
+    ) -> impl Filter<Extract = (DbLite,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || db.clone())
+    }
+
     fn json_body() -> impl Filter<Extract = (Todo,), Error = warp::Rejection> + Clone {
+        //When accepting a body, we want a JSON body
+        // (and to reject huge payloads)
+        warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+    }
+
+    fn json_flag_body() -> impl Filter<Extract = (Flag,), Error = warp::Rejection> + Clone {
         //When accepting a body, we want a JSON body
         // (and to reject huge payloads)
         warp::body::content_length_limit(1024 * 16).and(warp::body::json())
@@ -102,8 +148,36 @@ mod filters {
 
 mod handlers {
     use super::models::{Db, ListOptions, Todo};
+    use super::models::{DbLite, Flag, FlagWithID};
     use std::convert::Infallible;
     use warp::http::StatusCode;
+
+    use rusqlite::params;
+
+    pub async fn list_flags(db: DbLite) -> Result<impl warp::Reply, Infallible> {
+        let conn = db.lock().await;
+
+        let mut stmt = conn.prepare("SELECT id, name, value FROM flags").unwrap();
+
+        let flag_iter = stmt
+            .query_map([], |row| {
+                let value = match row.get(2).unwrap() {
+                    1 => true,
+                    _ => false,
+                };
+
+                Ok(FlagWithID {
+                    id: row.get(0).unwrap(),
+                    name: row.get(1).unwrap(),
+                    value,
+                })
+            })
+            .unwrap();
+
+        let flags_list: Vec<FlagWithID> = flag_iter.into_iter().map(|item| item.unwrap()).collect();
+
+        Ok(warp::reply::json(&flags_list))
+    }
 
     pub async fn list_todos(opts: ListOptions, db: Db) -> Result<impl warp::Reply, Infallible> {
         // Just return a JSON array of todos, applying the limit and offset.
@@ -116,6 +190,25 @@ mod handlers {
             .collect();
 
         Ok(warp::reply::json(&todos))
+    }
+
+    pub async fn create_flag(new_flag: Flag, db: DbLite) -> Result<impl warp::Reply, Infallible> {
+        log::debug!("create_flag: {:?}", new_flag);
+
+        // TODO: create new flag
+        let conn = db.lock().await;
+        let result = conn.execute(
+            "INSERT INTO flags (name, value) Values (?1, ?2)",
+            params![new_flag.name, new_flag.value],
+        );
+
+        match result {
+            Err(err) => {
+                log::debug!("Failed to create_new flag: {:?}", err);
+                Ok(StatusCode::BAD_REQUEST)
+            }
+            Ok(_) => Ok(StatusCode::CREATED),
+        }
     }
 
     pub async fn create_todo(create: Todo, db: Db) -> Result<impl warp::Reply, Infallible> {
@@ -189,12 +282,24 @@ mod models {
     use std::sync::Arc;
     use tokio::sync::Mutex;
 
+    use rusqlite::Connection;
+    use std::path::Path;
+
     /// So we don't have to tackle how different dfatabase works, we'll just use
     /// a simple in=memory DB, a vector synchronized by a mutex.
     pub type Db = Arc<Mutex<Vec<Todo>>>;
+    pub type DbLite = Arc<Mutex<Connection>>;
 
     pub fn blank_db() -> Db {
         Arc::new(Mutex::new(Vec::new()))
+    }
+
+    pub fn get_db() -> DbLite {
+        let path = Path::new("instance").join("flag.db");
+
+        let conn = Connection::open(path).expect("Unable to find the db");
+
+        Arc::new(Mutex::new(conn))
     }
 
     #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -209,6 +314,19 @@ mod models {
     pub struct ListOptions {
         pub offset: Option<usize>,
         pub limit: Option<usize>,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct FlagWithID {
+        pub id: i32,
+        pub name: String,
+        pub value: bool,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct Flag {
+        pub name: String,
+        pub value: bool,
     }
 }
 
