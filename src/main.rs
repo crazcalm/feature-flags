@@ -26,11 +26,11 @@ async fn main() {
 
 mod filters {
 
-    use crate::handlers::{create_flag, list_flags};
+    use crate::handlers::{create_flag, list_flags, update_flag};
 
     use super::handlers;
     use super::models::{Db, ListOptions, Todo};
-    use super::models::{DbLite, Flag};
+    use super::models::{DbLite, Flag, FlagValue};
     use serde::de::value::Error;
     use warp::Filter;
 
@@ -48,7 +48,9 @@ mod filters {
     pub fn feature_flag_all_routes(
         db: DbLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        feature_flag_create(db.clone()).or(flags_list(db.clone()))
+        feature_flag_create(db.clone())
+            .or(flags_list(db.clone()))
+            .or(flags_update(db.clone()))
     }
 
     /// GET
@@ -105,6 +107,16 @@ mod filters {
             .and_then(handlers::update_todo)
     }
 
+    pub fn flags_update(
+        db: DbLite,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("flags" / u64)
+            .and(warp::put())
+            .and(json_bool_body())
+            .and(with_db_lite(db))
+            .and_then(handlers::update_flag)
+    }
+
     /// DELETE
     pub fn todos_delete(
         db: Db,
@@ -144,11 +156,15 @@ mod filters {
         // (and to reject huge payloads)
         warp::body::content_length_limit(1024 * 16).and(warp::body::json())
     }
+
+    fn json_bool_body() -> impl Filter<Extract = (FlagValue,), Error = warp::Rejection> + Clone {
+        warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+    }
 }
 
 mod handlers {
     use super::models::{Db, ListOptions, Todo};
-    use super::models::{DbLite, Flag, FlagWithID};
+    use super::models::{DbLite, Flag, FlagValue, FlagWithID};
     use std::convert::Infallible;
     use warp::http::StatusCode;
 
@@ -195,7 +211,6 @@ mod handlers {
     pub async fn create_flag(new_flag: Flag, db: DbLite) -> Result<impl warp::Reply, Infallible> {
         log::debug!("create_flag: {:?}", new_flag);
 
-        // TODO: create new flag
         let conn = db.lock().await;
         let result = conn.execute(
             "INSERT INTO flags (name, value) Values (?1, ?2)",
@@ -228,6 +243,43 @@ mod handlers {
         vec.push(create);
 
         Ok(StatusCode::CREATED)
+    }
+
+    pub async fn update_flag(
+        id: u64,
+        flag_value: FlagValue,
+        db: DbLite,
+    ) -> Result<impl warp::Reply, Infallible> {
+        log::debug!("update_flag: id: {:?}, value {:?}", id, flag_value);
+
+        let conn = db.lock().await;
+
+        let mut stmt = conn
+            .prepare("SELECT name, value FROM flags WHERE id = ?")
+            .unwrap();
+        let exist = stmt.exists(params![id]).unwrap();
+
+        // Not Found early exit
+        if exist == false {
+            return Ok(StatusCode::NOT_FOUND);
+        }
+
+        let value_as_int = match flag_value.value {
+            true => 1,
+            false => 0,
+        };
+
+        let result = conn.execute(
+            "UPDATE flags SET value = ? WHERE id = ?",
+            params![value_as_int, id],
+        );
+        match result {
+            Ok(_) => Ok(StatusCode::OK),
+            Err(_) => {
+                log::debug!("Unble to update flag");
+                Ok(StatusCode::from_u16(500).unwrap())
+            }
+        }
     }
 
     pub async fn update_todo(
@@ -326,6 +378,11 @@ mod models {
     #[derive(Debug, Deserialize)]
     pub struct Flag {
         pub name: String,
+        pub value: bool,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct FlagValue {
         pub value: bool,
     }
 }
