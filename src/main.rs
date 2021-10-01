@@ -26,12 +26,9 @@ async fn main() {
 
 mod filters {
 
-    use crate::handlers::{create_flag, list_flags, update_flag};
-
     use super::handlers;
     use super::models::{Db, ListOptions, Todo};
     use super::models::{DbLite, Flag, FlagValue};
-    use serde::de::value::Error;
     use warp::Filter;
 
     /// All the TODOs filters combined.
@@ -51,6 +48,7 @@ mod filters {
         feature_flag_create(db.clone())
             .or(flags_list(db.clone()))
             .or(flags_update(db.clone()))
+            .or(flags_delete(db.clone()))
     }
 
     /// GET
@@ -133,6 +131,16 @@ mod filters {
             .and(warp::delete())
             .and(with_db(db))
             .and_then(handlers::delete_todo)
+    }
+
+    /// DELETE
+    pub fn flags_delete(
+        db: DbLite,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("flags" / u64)
+            .and(warp::delete())
+            .and(with_db_lite(db))
+            .and_then(handlers::delete_flag)
     }
 
     fn with_db(db: Db) -> impl Filter<Extract = (Db,), Error = std::convert::Infallible> + Clone {
@@ -325,6 +333,21 @@ mod handlers {
         } else {
             log::debug!("    -> todo id not found!");
             Ok(StatusCode::NOT_FOUND)
+        }
+    }
+
+    pub async fn delete_flag(id: u64, db: DbLite) -> Result<impl warp::Reply, Infallible> {
+        log::debug!("delete flag id <{}>", id);
+
+        let conn = db.lock().await;
+        let result = conn.execute("DELETE FROM flag WHERE id = ?", params![id]);
+
+        match result {
+            Ok(_) => Ok(StatusCode::NO_CONTENT),
+            Err(err) => {
+                log::debug!("Error when deleting a flag: {:?}", err);
+                Ok(StatusCode::from_u16(500).unwrap())
+            }
         }
     }
 }
