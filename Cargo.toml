@@ -6,14 +6,6 @@ default-run = "server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[[bin]]
-name = "server"
-path = "src/main.rs"
-
-[[bin]]
-name = "db-init"
-path = "src/bin/db-init.rs"
-
 [dependencies.serde]
 version = "1.0"
 features = ["derive"]

@@ -23,12 +23,14 @@ async fn main() {
 mod filters {
 
     use super::handlers;
-    use super::models::{DbLite, Flag, FlagValue};
+    use super::models::{Flag, FlagValue};
     use warp::Filter;
+
+    use feature_flags::db::DBLite;
 
     /// All the Feature Flag filters combined.
     pub fn feature_flag_all_routes(
-        db: DbLite,
+        db: DBLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         feature_flag_create(db.clone())
             .or(flags_list(db.clone()))
@@ -38,7 +40,7 @@ mod filters {
 
     /// GET flags
     pub fn flags_list(
-        db: DbLite,
+        db: DBLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("flags")
             .and(warp::get())
@@ -48,7 +50,7 @@ mod filters {
 
     /// POST Feature Flag
     pub fn feature_flag_create(
-        db: DbLite,
+        db: DBLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("flags")
             .and(warp::post())
@@ -58,7 +60,7 @@ mod filters {
     }
 
     pub fn flags_update(
-        db: DbLite,
+        db: DBLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("flags" / u64)
             .and(warp::put())
@@ -69,7 +71,7 @@ mod filters {
 
     /// DELETE
     pub fn flags_delete(
-        db: DbLite,
+        db: DBLite,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("flags" / u64)
             .and(warp::delete())
@@ -78,8 +80,8 @@ mod filters {
     }
 
     fn with_db_lite(
-        db: DbLite,
-    ) -> impl Filter<Extract = (DbLite,), Error = std::convert::Infallible> + Clone {
+        db: DBLite,
+    ) -> impl Filter<Extract = (DBLite,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 
