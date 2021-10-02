@@ -340,7 +340,7 @@ mod handlers {
         log::debug!("delete flag id <{}>", id);
 
         let conn = db.lock().await;
-        let result = conn.execute("DELETE FROM flag WHERE id = ?", params![id]);
+        let result = conn.execute("DELETE FROM flags WHERE id = ?", params![id]);
 
         match result {
             Ok(_) => Ok(StatusCode::NO_CONTENT),
