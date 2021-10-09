@@ -1,6 +1,8 @@
 use std::env;
 use warp::Filter;
 
+use feature_flags::db::get_db_server;
+
 #[tokio::main]
 async fn main() {
     if env::var_os("RUST_LOG").is_none() {
@@ -10,7 +12,7 @@ async fn main() {
 
     pretty_env_logger::init();
 
-    let db_lite = models::get_db();
+    let db_lite = get_db_server();
 
     let flags_api = filters::feature_flag_all_routes(db_lite);
 
@@ -21,12 +23,10 @@ async fn main() {
 }
 
 mod filters {
-
     use super::handlers;
-    use super::models::{Flag, FlagValue};
     use warp::Filter;
 
-    use feature_flags::db::DBLite;
+    use feature_flags::db::{DBLite, Flag, FlagValue};
 
     /// All the Feature Flag filters combined.
     pub fn feature_flag_all_routes(
@@ -97,13 +97,13 @@ mod filters {
 }
 
 mod handlers {
-    use super::models::{DbLite, Flag, FlagValue, FlagWithID};
+    use feature_flags::db::{DBLite, Flag, FlagValue, FlagWithID};
     use std::convert::Infallible;
     use warp::http::StatusCode;
 
     use rusqlite::params;
 
-    pub async fn list_flags(db: DbLite) -> Result<impl warp::Reply, Infallible> {
+    pub async fn list_flags(db: DBLite) -> Result<impl warp::Reply, Infallible> {
         let conn = db.lock().await;
 
         let mut stmt = conn.prepare("SELECT id, name, value FROM flags").unwrap();
@@ -128,7 +128,7 @@ mod handlers {
         Ok(warp::reply::json(&flags_list))
     }
 
-    pub async fn create_flag(new_flag: Flag, db: DbLite) -> Result<impl warp::Reply, Infallible> {
+    pub async fn create_flag(new_flag: Flag, db: DBLite) -> Result<impl warp::Reply, Infallible> {
         log::debug!("create_flag: {:?}", new_flag);
 
         let conn = db.lock().await;
@@ -149,7 +149,7 @@ mod handlers {
     pub async fn update_flag(
         id: u64,
         flag_value: FlagValue,
-        db: DbLite,
+        db: DBLite,
     ) -> Result<impl warp::Reply, Infallible> {
         log::debug!("update_flag: id: {:?}, value {:?}", id, flag_value);
 
@@ -183,7 +183,7 @@ mod handlers {
         }
     }
 
-    pub async fn delete_flag(id: u64, db: DbLite) -> Result<impl warp::Reply, Infallible> {
+    pub async fn delete_flag(id: u64, db: DBLite) -> Result<impl warp::Reply, Infallible> {
         log::debug!("delete flag id <{}>", id);
 
         let conn = db.lock().await;
@@ -196,43 +196,6 @@ mod handlers {
                 Ok(StatusCode::from_u16(500).unwrap())
             }
         }
-    }
-}
-
-mod models {
-    use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
-
-    use rusqlite::Connection;
-    use std::path::Path;
-
-    pub type DbLite = Arc<Mutex<Connection>>;
-
-    pub fn get_db() -> DbLite {
-        let path = Path::new("instance").join("flag.db");
-
-        let conn = Connection::open(path).expect("Unable to find the db");
-
-        Arc::new(Mutex::new(conn))
-    }
-
-    #[derive(Debug, Serialize)]
-    pub struct FlagWithID {
-        pub id: i32,
-        pub name: String,
-        pub value: bool,
-    }
-
-    #[derive(Debug, Deserialize)]
-    pub struct Flag {
-        pub name: String,
-        pub value: bool,
-    }
-
-    #[derive(Debug, Deserialize)]
-    pub struct FlagValue {
-        pub value: bool,
     }
 }
 

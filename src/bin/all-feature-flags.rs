@@ -1,39 +1,14 @@
-use std::path::Path;
+use rusqlite::Result;
 
-use rusqlite::{Connection, Result};
-
-#[derive(Debug)]
-struct Flag {
-    id: i32,
-    name: String,
-    value: bool,
-}
+use feature_flags::db::{get_all_flags, get_db_rc};
 
 fn main() -> Result<()> {
-    let path = Path::new("instance").join("flag.db");
+    let conn = get_db_rc();
 
-    let conn = Connection::open(path)?;
-
-    let mut stmt = conn.prepare("SELECT id, name, value FROM flags")?;
-
-    let flag_iter = stmt.query_map([], |row| {
-        let value = match row.get(2)? {
-            1 => true,
-            _ => false,
-        };
-
-        Ok(Flag {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            value,
-        })
-    })?;
-
-    for flag_result in flag_iter {
-        let flag = flag_result.unwrap();
+    let rows = get_all_flags(conn.clone()).expect("Unable to get all flags");
+    for flag in rows {
         println!("flag: {}: {}", flag.name, flag.value);
     }
-
     println!("Done");
 
     Ok(())

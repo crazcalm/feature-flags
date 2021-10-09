@@ -1,8 +1,7 @@
 use std::env;
-use std::path::Path;
 use std::process::exit;
 
-use rusqlite::{params, Connection, Result};
+use feature_flags::db;
 
 const HELP: &str = "
 Command to create a new flag
@@ -19,43 +18,41 @@ cargo run --bin create-flag name value
 
 ";
 
-fn valuate_value(arg: String) -> i32 {
+fn valuate_value(arg: String) -> Result<i32, String> {
     //TODO: Change this to a Result so that
     //      I can test this.
 
     match arg.to_lowercase().trim() {
-        "true" => 1,
-        "false" => 0,
-        _ => {
-            println!("Value much be 'true' or 'false'");
-            exit(1);
-        }
+        "true" => Ok(1),
+        "false" => Ok(0),
+        _ => Err("Value much be 'true' or 'false'".to_string()),
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<(), rusqlite::Error> {
     // TODO: Move the arg parsing code into a function
-    let mut args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().skip(1).collect();
 
-    if args.len() != 3 {
+    if args.len() != 2 {
         println!("{}", HELP);
         exit(1);
     }
 
-    let name = args.remove(1);
-    let value = valuate_value(args.remove(1));
+    let name = args.remove(0);
+    let value = match valuate_value(args.remove(0)) {
+        Ok(value) => value,
+        Err(err) => panic!("{}", err),
+    };
 
-    // TODO: Figure out how to test this properly
-    let path = Path::new("instance").join("flag.db");
+    let conn = db::get_db_rc();
 
-    let conn = Connection::open(path)?;
+    let result = db::add_flag(conn.clone(), name, value);
 
-    conn.execute(
-        "INSERT INTO flags (name, value) VALUES (?1, ?2)",
-        params![name, value],
-    )?;
-
-    println!("Done");
+    // TODO: Make error message look better
+    match result {
+        Ok(_) => println!("Successfully added to the db"),
+        Err(err) => println!("Failed to add to db: {:?}", err),
+    }
 
     Ok(())
 }

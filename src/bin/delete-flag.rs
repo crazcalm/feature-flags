@@ -1,8 +1,9 @@
 use std::env;
-use std::path::Path;
 use std::process::exit;
 
-use rusqlite::{params, Connection, Result};
+use rusqlite::Result;
+
+use feature_flags::db::{delete_flag_by_name, get_db_rc};
 
 const HELP: &str = "
 Command to delete a single flag
@@ -18,20 +19,17 @@ cargo run --bin delete-flag name
 ";
 
 fn main() -> Result<()> {
-    let mut args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().skip(1).collect();
 
-    if args.len() != 2 {
+    if args.len() != 1 {
         println!("{}", HELP);
         exit(1);
     }
 
-    let name = args.remove(1);
+    let name = args.remove(0);
 
-    let path = Path::new("instance").join("flag.db");
-
-    let conn = Connection::open(path)?;
-    let result = conn.execute("DELETE FROM flags WHERE name = ?", params![name]);
-
+    let conn = get_db_rc();
+    let result = delete_flag_by_name(conn.clone(), name);
     match result {
         Ok(deleted) => {
             println!("{} rows where deleted", deleted);
