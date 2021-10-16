@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 pub type DBLite = Arc<Mutex<Connection>>;
+pub type DBLocal = Rc<Connection>;
 
 #[derive(Debug, Serialize)]
 pub struct FlagWithID {
@@ -34,7 +35,7 @@ pub fn get_db() -> Connection {
     conn
 }
 
-pub fn get_db_rc() -> Rc<Connection> {
+pub fn get_db_rc() -> DBLocal {
     Rc::new(get_db())
 }
 
@@ -43,7 +44,7 @@ pub fn get_db_server() -> DBLite {
     Arc::new(Mutex::new(conn))
 }
 
-pub fn get_flag_by_name(conn: Rc<Connection>, name: String) -> Result<FlagWithID, rusqlite::Error> {
+pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, rusqlite::Error> {
     let result = conn.query_row(
         "SELECT id, name, value FROM flags WHERE name = ?",
         params![name],
@@ -64,7 +65,7 @@ pub fn get_flag_by_name(conn: Rc<Connection>, name: String) -> Result<FlagWithID
     result
 }
 
-pub fn get_all_flags(conn: Rc<Connection>) -> Result<Vec<FlagWithID>, rusqlite::Error> {
+pub fn get_all_flags(conn: DBLocal) -> Result<Vec<FlagWithID>, rusqlite::Error> {
     let mut stmt = conn.prepare("SELECT id, name, value FROM flags")?;
 
     let rows = stmt.query_map([], |row| {
@@ -89,13 +90,27 @@ pub fn get_all_flags(conn: Rc<Connection>) -> Result<Vec<FlagWithID>, rusqlite::
     Ok(result)
 }
 
-pub fn delete_flag_by_name(conn: Rc<Connection>, name: String) -> Result<usize, rusqlite::Error> {
+pub fn delete_flag_by_name(conn: DBLocal, name: String) -> Result<usize, rusqlite::Error> {
     conn.execute("DELETE FROM flags WHERE name = ?", params![name])
 }
 
-pub fn add_flag(conn: Rc<Connection>, name: String, value: i32) -> Result<usize, rusqlite::Error> {
+pub fn add_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, rusqlite::Error> {
     conn.execute(
         "INSERT INTO flags (name, value) VALUES (?1, ?2)",
         params![name, value],
+    )
+}
+
+pub fn update_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, rusqlite::Error> {
+    match get_flag_by_name(conn.clone(), name.clone()) {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("Error when updating the flag: {:?}", err);
+        }
+    }
+
+    conn.execute(
+        "UPDATE flags SET value = ? WHERE name = ?",
+        params![value, name],
     )
 }
