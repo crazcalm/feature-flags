@@ -30,9 +30,7 @@ pub struct FlagValue {
 pub fn get_db() -> Connection {
     let path = Path::new("instance").join("flag.db");
 
-    let conn = Connection::open(path).expect("Unable to find the db");
-
-    conn
+    Connection::open(path).expect("Unable to find the db")
 }
 
 pub fn get_db_rc() -> DBLocal {
@@ -61,14 +59,11 @@ pub fn initialize_db(conn: DBLocal) {
 }
 
 pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, rusqlite::Error> {
-    let result = conn.query_row(
+    conn.query_row(
         "SELECT id, name, value FROM flags WHERE name = ?",
         params![name],
         |row| {
-            let value = match row.get(2)? {
-                1 => true,
-                _ => false,
-            };
+            let value = matches!(row.get(2)?, 1);
 
             Ok(FlagWithID {
                 id: row.get(0)?,
@@ -76,19 +71,14 @@ pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, rusql
                 value,
             })
         },
-    );
-
-    result
+    )
 }
 
 pub fn get_all_flags(conn: DBLocal) -> Result<Vec<FlagWithID>, rusqlite::Error> {
     let mut stmt = conn.prepare("SELECT id, name, value FROM flags")?;
 
     let rows = stmt.query_map([], |row| {
-        let value = match row.get(2)? {
-            1 => true,
-            _ => false,
-        };
+        let value = matches!(row.get(2)?, 1);
 
         Ok(FlagWithID {
             id: row.get(0)?,

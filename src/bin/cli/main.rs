@@ -1,3 +1,5 @@
+use std::io;
+
 mod cli;
 mod subcommands;
 
@@ -22,7 +24,10 @@ fn main() {
             "all" => {
                 let db = get_db_rc();
 
-                subcommands::all_flags::all_flags(db);
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
+                subcommands::all_flags::all_flags_v2(db, writer);
             }
             "create" => {
                 let name = command.matches.value_of("name").unwrap().to_string();

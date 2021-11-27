@@ -1,7 +1,7 @@
 use feature_flags::db;
 
 pub fn update_flag(conn: db::DBLocal, name: String, value: i32) {
-    let result = db::update_flag(conn.clone(), name, value);
+    let result = db::update_flag(conn, name, value);
 
     match result {
         Ok(_) => println!("Successfully updated the db"),
