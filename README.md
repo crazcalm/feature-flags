@@ -9,3 +9,13 @@ See [tarpaulin](https://github.com/xd009642/tarpaulin) for installation instruct
 cargo tarpaulin
 ```
 
+## Pre-Commit Hooks
+See [pre-commit website] for installation instructions.
+
+### Install hooks locally
+```
+pre-commit install
+```
+
+### Rust Hooks
+Documentation for the hooks I am using can be found [here](https://github.com/doublify/pre-commit-rust).
