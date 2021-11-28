@@ -35,7 +35,7 @@ mod filters {
         feature_flag_create(db.clone())
             .or(flags_list(db.clone()))
             .or(flags_update(db.clone()))
-            .or(flags_delete(db.clone()))
+            .or(flags_delete(db))
     }
 
     /// GET flags
@@ -110,10 +110,7 @@ mod handlers {
 
         let flag_iter = stmt
             .query_map([], |row| {
-                let value = match row.get(2).unwrap() {
-                    1 => true,
-                    _ => false,
-                };
+                let value = matches!(row.get(2).unwrap(), 1);
 
                 Ok(FlagWithID {
                     id: row.get(0).unwrap(),
@@ -161,7 +158,7 @@ mod handlers {
         let exist = stmt.exists(params![id]).unwrap();
 
         // Not Found early exit
-        if exist == false {
+        if !exist {
             return Ok(StatusCode::NOT_FOUND);
         }
 

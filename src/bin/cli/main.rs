@@ -1,3 +1,5 @@
+use std::io;
+
 mod cli;
 mod subcommands;
 
@@ -22,7 +24,10 @@ fn main() {
             "all" => {
                 let db = get_db_rc();
 
-                subcommands::all_flags::all_flags(db);
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
+                subcommands::all_flags::all_flags(db, writer);
             }
             "create" => {
                 let name = command.matches.value_of("name").unwrap().to_string();
@@ -30,8 +35,11 @@ fn main() {
                     convert_string_to_sqlite_bool(command.matches.value_of("bool").unwrap())
                         .unwrap();
 
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
                 let db = get_db_rc();
-                subcommands::create_flags::create_flag(db, name, value)
+                subcommands::create_flags::create_flag(db, name, value, writer)
             }
             "update" => {
                 let name = command.matches.value_of("name").unwrap().to_string();
@@ -40,18 +48,27 @@ fn main() {
                         .unwrap();
 
                 let db = get_db_rc();
-                subcommands::update_flags::update_flag(db, name, value)
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
+                subcommands::update_flags::update_flag(db, name, value, writer)
             }
             "get" => {
                 let name = command.matches.value_of("name").unwrap().to_string();
 
                 let db = get_db_rc();
-                subcommands::get_flags::get_flag(db, name);
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
+                subcommands::get_flags::get_flag(db, name, writer);
             }
             "delete" => {
                 let name = command.matches.value_of("name").unwrap().to_string();
                 let db = get_db_rc();
-                subcommands::delete_flags::delete_flag(db, name);
+                let stdout = io::stdout();
+                let writer = stdout.lock();
+
+                subcommands::delete_flags::delete_flag(db, name, writer);
             }
             _ => panic!("A subcommand was added to the cli but was not connected to the cli"),
         },
