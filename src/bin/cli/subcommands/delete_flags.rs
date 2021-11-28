@@ -12,7 +12,7 @@ pub fn delete_flag(db: DBLocal, name: String, mut writer: impl Write) {
         }
         Err(err) => {
             writer
-                .write_all(format!("delete failed: {}\n", err).as_bytes())
+                .write_all(format!("delete failed: {:?}\n", err).as_bytes())
                 .unwrap();
         }
     };
@@ -34,7 +34,7 @@ mod tests {
 
         let local_conn = Rc::new(conn);
 
-        db::initialize_db(local_conn.clone());
+        db::initialize_db(local_conn.clone()).unwrap();
 
         local_conn
     }
