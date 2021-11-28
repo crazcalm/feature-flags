@@ -28,7 +28,7 @@ mod tests {
 
         let local_conn = Rc::new(conn);
 
-        db::initialize_db(local_conn.clone());
+        db::initialize_db(local_conn.clone()).unwrap();
 
         local_conn
     }
