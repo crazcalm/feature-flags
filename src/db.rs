@@ -6,6 +6,8 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
+use crate::error::FeatureFlagError;
+
 pub type DBLite = Arc<Mutex<Connection>>;
 pub type DBLocal = Rc<Connection>;
 
@@ -58,8 +60,8 @@ pub fn initialize_db(conn: DBLocal) {
     println!("Successful Initialize the DB");
 }
 
-pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, rusqlite::Error> {
-    conn.query_row(
+pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, FeatureFlagError> {
+    let result = conn.query_row(
         "SELECT id, name, value FROM flags WHERE name = ?",
         params![name],
         |row| {
@@ -71,10 +73,12 @@ pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, rusql
                 value,
             })
         },
-    )
+    )?;
+
+    Ok(result)
 }
 
-pub fn get_all_flags(conn: DBLocal) -> Result<Vec<FlagWithID>, rusqlite::Error> {
+pub fn get_all_flags(conn: DBLocal) -> Result<Vec<FlagWithID>, FeatureFlagError> {
     let mut stmt = conn.prepare("SELECT id, name, value FROM flags")?;
 
     let rows = stmt.query_map([], |row| {
@@ -96,18 +100,22 @@ pub fn get_all_flags(conn: DBLocal) -> Result<Vec<FlagWithID>, rusqlite::Error> 
     Ok(result)
 }
 
-pub fn delete_flag_by_name(conn: DBLocal, name: String) -> Result<usize, rusqlite::Error> {
-    conn.execute("DELETE FROM flags WHERE name = ?", params![name])
+pub fn delete_flag_by_name(conn: DBLocal, name: String) -> Result<usize, FeatureFlagError> {
+    let result = conn.execute("DELETE FROM flags WHERE name = ?", params![name])?;
+
+    Ok(result)
 }
 
-pub fn add_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, rusqlite::Error> {
-    conn.execute(
+pub fn add_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, FeatureFlagError> {
+    let result = conn.execute(
         "INSERT INTO flags (name, value) VALUES (?1, ?2)",
         params![name, value],
-    )
+    )?;
+
+    Ok(result)
 }
 
-pub fn update_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, rusqlite::Error> {
+pub fn update_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, FeatureFlagError> {
     match get_flag_by_name(conn.clone(), name.clone()) {
         Ok(_) => {}
         Err(err) => {
@@ -115,10 +123,12 @@ pub fn update_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, rus
         }
     }
 
-    conn.execute(
+    let result = conn.execute(
         "UPDATE flags SET value = ? WHERE name = ?",
         params![value, name],
-    )
+    )?;
+
+    Ok(result)
 }
 
 #[cfg(test)]

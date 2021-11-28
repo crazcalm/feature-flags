@@ -12,7 +12,7 @@ pub fn delete_flag(db: DBLocal, name: String, mut writer: impl Write) {
         }
         Err(err) => {
             writer
-                .write_all(format!("delete failed: {}\n", err).as_bytes())
+                .write_all(format!("delete failed: {:?}\n", err).as_bytes())
                 .unwrap();
         }
     };
