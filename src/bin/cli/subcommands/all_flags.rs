@@ -2,7 +2,7 @@ use std::io::Write;
 
 use feature_flags::db::{get_all_flags, DBLocal};
 
-pub fn all_flags_v2(db: DBLocal, mut writer: impl Write) {
+pub fn all_flags(db: DBLocal, mut writer: impl Write) {
     let rows = get_all_flags(db).expect("Unable to get all flags");
     for flag in rows {
         writer
@@ -41,7 +41,7 @@ mod tests {
         let buf_writer = BufWriter::new(buffer.as_mut());
 
         // Case: Zero Flags
-        let _ = all_flags_v2(conn.clone(), buf_writer);
+        let _ = all_flags(conn.clone(), buf_writer);
 
         assert_eq!(std::str::from_utf8(&buffer).unwrap(), "Done\n");
 
@@ -59,7 +59,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let buf_writer = BufWriter::new(buffer.as_mut());
 
-        let _ = all_flags_v2(conn.clone(), buf_writer);
+        let _ = all_flags(conn.clone(), buf_writer);
 
         assert_eq!(
             std::str::from_utf8(&buffer).unwrap(),
