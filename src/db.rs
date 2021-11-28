@@ -44,8 +44,8 @@ pub fn get_db_server() -> DBLite {
     Arc::new(Mutex::new(conn))
 }
 
-pub fn initialize_db(conn: DBLocal) {
-    conn.execute_batch(
+pub fn initialize_db(conn: DBLocal) -> Result<(), FeatureFlagError> {
+    let result = conn.execute_batch(
         "DROP TABLE IF EXISTS flags;
 
         CREATE TABLE flags (
@@ -54,10 +54,9 @@ pub fn initialize_db(conn: DBLocal) {
             value INTEGER NOT NULL CHECK(value == 0 OR value == 1),
             PRIMARY KEY(id)
         );",
-    )
-    .expect("Error occured while trying to initialize the DB");
+    )?;
 
-    println!("Successful Initialize the DB");
+    Ok(result)
 }
 
 pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, FeatureFlagError> {
@@ -116,12 +115,7 @@ pub fn add_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, Featur
 }
 
 pub fn update_flag(conn: DBLocal, name: String, value: i32) -> Result<usize, FeatureFlagError> {
-    match get_flag_by_name(conn.clone(), name.clone()) {
-        Ok(_) => {}
-        Err(err) => {
-            panic!("Error when updating the flag: {:?}", err);
-        }
-    }
+    let _ = get_flag_by_name(conn.clone(), name.clone())?;
 
     let result = conn.execute(
         "UPDATE flags SET value = ? WHERE name = ?",
@@ -144,10 +138,42 @@ mod tests {
 
         let local_conn = Rc::new(conn);
 
-        // TODO: Update this call to return a Result
-        initialize_db(local_conn.clone());
+        initialize_db(local_conn.clone()).unwrap();
 
         local_conn
+    }
+
+    #[test]
+    fn test_delete_flag_failure() {
+        let conn = in_member_db();
+
+        let result = delete_flag_by_name(conn.clone(), "test".to_string()).unwrap();
+
+        assert_eq!(result, 0)
+    }
+
+    #[test]
+    fn test_update_flag_error() {
+        let conn = in_member_db();
+
+        let result = update_flag(conn.clone(), "test".to_string(), 0);
+
+        assert_eq!(
+            format!("{:?}", result),
+            "Err(RusqliteError(QueryReturnedNoRows))"
+        )
+    }
+
+    #[test]
+    fn test_get_flag_by_name_error() {
+        let conn = in_member_db();
+
+        let result = get_flag_by_name(conn.clone(), "test".to_string());
+
+        assert_eq!(
+            format!("{:?}", result),
+            "Err(RusqliteError(QueryReturnedNoRows))"
+        )
     }
 
     #[test]
