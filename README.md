@@ -4,6 +4,8 @@ Feature flag service in Rust
 ## Code Coverage
 See [tarpaulin](https://github.com/xd009642/tarpaulin) for installation instructions.
 
+**NOTE:** This depends on the [openssl crate](https://docs.rs/openssl/0.10.29/openssl/#automatic), which has its own list dependencies that need to be installed.
+
 ### How to Run
 ```
 cargo tarpaulin
