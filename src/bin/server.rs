@@ -197,4 +197,49 @@ mod handlers {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::sync::Arc;
+
+    use rusqlite::Connection;
+    use tokio::sync::Mutex;
+
+    use super::filters::*;
+    use feature_flags::db::*;
+
+    fn in_memery_db() -> DBLite {
+        let conn = Connection::open_in_memory().unwrap();
+
+        let local_conn = Arc::new(Mutex::new(conn));
+
+        local_conn
+    }
+
+    #[tokio::test]
+    async fn test_unknown_route() {
+        let db_conn = in_memery_db();
+        let filter = feature_flag_create(db_conn.clone());
+
+        let response = warp::test::request().path("hi").reply(&filter).await;
+
+        assert_eq!(response.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_create_flag() {
+        let db_conn = in_memery_db();
+        let filter = feature_flag_create(db_conn.clone());
+
+        let response = warp::test::request()
+            .method("POST")
+            .path("/flags")
+            .json(&Flag {
+                name: "test".to_string(),
+                value: true,
+            })
+            .reply(&filter)
+            .await;
+
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.body(), "hi");
+    }
+}

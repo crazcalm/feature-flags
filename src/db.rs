@@ -18,7 +18,7 @@ pub struct FlagWithID {
     pub value: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Flag {
     pub name: String,
     pub value: bool,
