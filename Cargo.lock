@@ -218,6 +218,8 @@ dependencies = [
  "pretty_env_logger",
  "rusqlite",
  "serde",
+ "serde_derive",
+ "serde_json",
  "tokio",
  "warp",
 ]

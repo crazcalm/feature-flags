@@ -1,7 +1,15 @@
 use std::env;
 use warp::Filter;
 
+use serde_derive::{Deserialize, Serialize};
+
 use feature_flags::db::get_db_server;
+
+#[derive(Serialize)]
+struct ErrorMessage {
+    code: u16,
+    message: String,
+}
 
 #[tokio::main]
 async fn main() {
@@ -101,7 +109,9 @@ mod handlers {
     use std::convert::Infallible;
     use warp::http::StatusCode;
 
+    use super::ErrorMessage;
     use rusqlite::params;
+    use serde_derive::{Deserialize, Serialize};
 
     pub async fn list_flags(db: DBLite) -> Result<impl warp::Reply, Infallible> {
         let conn = db.lock().await;
@@ -126,7 +136,7 @@ mod handlers {
     }
 
     pub async fn create_flag(new_flag: Flag, db: DBLite) -> Result<impl warp::Reply, Infallible> {
-        log::debug!("create_flag: {:?}", new_flag);
+        println!("create_flag: {:?}", new_flag);
 
         let conn = db.lock().await;
         let result = conn.execute(
@@ -137,9 +147,16 @@ mod handlers {
         match result {
             Err(err) => {
                 log::debug!("Failed to create_new flag: {:?}", err);
-                Ok(StatusCode::BAD_REQUEST)
+                //Ok(StatusCode::BAD_REQUEST)
+                Ok(warp::reply::json(&ErrorMessage {
+                    code: StatusCode::BAD_REQUEST.as_u16(),
+                    message: format!("{:?}", err),
+                }))
             }
-            Ok(_) => Ok(StatusCode::CREATED),
+            Ok(_) => Ok(warp::reply::json(&ErrorMessage {
+                code: StatusCode::CREATED.as_u16(),
+                message: "all good".to_string(),
+            })),
         }
     }
 
@@ -201,9 +218,12 @@ mod tests {
     use std::sync::Arc;
 
     use rusqlite::Connection;
+    use serde_json::json;
     use tokio::sync::Mutex;
+    use warp::Reply;
 
     use super::filters::*;
+    use super::handlers::*;
     use feature_flags::db::*;
 
     fn in_memery_db() -> DBLite {
@@ -227,19 +247,49 @@ mod tests {
     #[tokio::test]
     async fn test_create_flag() {
         let db_conn = in_memery_db();
-        let filter = feature_flag_create(db_conn.clone());
 
-        let response = warp::test::request()
-            .method("POST")
-            .path("/flags")
-            .json(&Flag {
+        initialize_db_arc(db_conn.clone()).await.unwrap();
+
+        let filter = feature_flag_create(db_conn.clone());
+        println!(
+            "{:?}",
+            json!(&Flag {
                 name: "test".to_string(),
                 value: true,
             })
+            .to_string()
+        );
+        let response = warp::test::request()
+            .method("POST")
+            .path("/flags")
+            .header("accept", "application/json")
+            .body(
+                json!(&Flag {
+                    name: "test".to_string(),
+                    value: true,
+                })
+                .to_string(),
+            )
             .reply(&filter)
             .await;
 
         assert_eq!(response.status(), 200);
         assert_eq!(response.body(), "hi");
+    }
+
+    #[tokio::test]
+    async fn test_create_flag_2() {
+        let db_conn = in_memery_db();
+
+        initialize_db_arc(db_conn.clone()).await.unwrap();
+
+        let flag = Flag {
+            name: "test".to_string(),
+            value: true,
+        };
+
+        let reply = create_flag(flag, db_conn.clone()).await.unwrap();
+
+        assert_eq!(format!("{:?}", reply.into_response()), "");
     }
 }
