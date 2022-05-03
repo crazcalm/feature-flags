@@ -6,6 +6,15 @@ default-run = "server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.hyper]
+version = "0.14"
+
+[dependencies.serde_derive]
+version = "1.0"
+
+[dependencies.serde_json]
+version = "1.0"
+
 [dependencies.serde]
 version = "1.0"
 features = ["derive"]

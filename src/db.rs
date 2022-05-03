@@ -18,7 +18,7 @@ pub struct FlagWithID {
     pub value: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Flag {
     pub name: String,
     pub value: bool,
@@ -59,6 +59,21 @@ pub fn initialize_db(conn: DBLocal) -> Result<(), FeatureFlagError> {
     Ok(result)
 }
 
+pub async fn initialize_db_arc(conn_mutex: DBLite) -> Result<(), FeatureFlagError> {
+    let conn = conn_mutex.lock().await;
+    let result = conn.execute_batch(
+        "DROP TABLE IF EXISTS flags;
+
+        CREATE TABLE flags (
+            id    INTEGER UNIQUE,
+            name  TEXT NOT NULL UNIQUE,
+            value INTEGER NOT NULL CHECK(value == 0 OR value == 1),
+            PRIMARY KEY(id)
+        );",
+    )?;
+
+    Ok(result)
+}
 pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, FeatureFlagError> {
     let result = conn.query_row(
         "SELECT id, name, value FROM flags WHERE name = ?",
