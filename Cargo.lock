@@ -214,10 +214,13 @@ name = "feature_flags"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "hyper",
  "log",
  "pretty_env_logger",
  "rusqlite",
  "serde",
+ "serde_derive",
+ "serde_json",
  "tokio",
  "warp",
 ]
