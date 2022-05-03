@@ -1,12 +1,12 @@
 use std::env;
 use warp::Filter;
 
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::Serialize;
 
 use feature_flags::db::get_db_server;
 
 #[derive(Serialize)]
-struct ErrorMessage {
+struct ResponseMessage {
     code: u16,
     message: String,
 }
@@ -109,9 +109,8 @@ mod handlers {
     use std::convert::Infallible;
     use warp::http::StatusCode;
 
-    use super::ErrorMessage;
+    use super::ResponseMessage;
     use rusqlite::params;
-    use serde_derive::{Deserialize, Serialize};
 
     pub async fn list_flags(db: DBLite) -> Result<impl warp::Reply, Infallible> {
         let conn = db.lock().await;
@@ -148,15 +147,21 @@ mod handlers {
             Err(err) => {
                 log::debug!("Failed to create_new flag: {:?}", err);
                 //Ok(StatusCode::BAD_REQUEST)
-                Ok(warp::reply::json(&ErrorMessage {
-                    code: StatusCode::BAD_REQUEST.as_u16(),
-                    message: format!("{:?}", err),
-                }))
+                Ok(warp::reply::with_status(
+                    warp::reply::json(&ResponseMessage {
+                        code: StatusCode::BAD_REQUEST.as_u16(),
+                        message: format!("{:?}", err),
+                    }),
+                    StatusCode::BAD_REQUEST,
+                ))
             }
-            Ok(_) => Ok(warp::reply::json(&ErrorMessage {
-                code: StatusCode::CREATED.as_u16(),
-                message: "all good".to_string(),
-            })),
+            Ok(_) => Ok(warp::reply::with_status(
+                warp::reply::json(&ResponseMessage {
+                    code: StatusCode::CREATED.as_u16(),
+                    message: format!("Flag {} was created", new_flag.name),
+                }),
+                StatusCode::CREATED,
+            )),
         }
     }
 
@@ -217,6 +222,7 @@ mod handlers {
 mod tests {
     use std::sync::Arc;
 
+    use hyper;
     use rusqlite::Connection;
     use serde_json::json;
     use tokio::sync::Mutex;
@@ -245,7 +251,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_flag() {
+    async fn test_create_flag_endpoint() {
+        // TODO: Learn how to check the body of the response here so that
+        // I do not have to test the same thing twice.
+
         let db_conn = in_memery_db();
 
         initialize_db_arc(db_conn.clone()).await.unwrap();
@@ -273,12 +282,11 @@ mod tests {
             .reply(&filter)
             .await;
 
-        assert_eq!(response.status(), 200);
-        assert_eq!(response.body(), "hi");
+        assert_eq!(response.status(), 201);
     }
 
     #[tokio::test]
-    async fn test_create_flag_2() {
+    async fn test_create_flag_handler() {
         let db_conn = in_memery_db();
 
         initialize_db_arc(db_conn.clone()).await.unwrap();
@@ -290,6 +298,17 @@ mod tests {
 
         let reply = create_flag(flag, db_conn.clone()).await.unwrap();
 
-        assert_eq!(format!("{:?}", reply.into_response()), "");
+        let mut response = reply.into_response();
+
+        // Got from https://github.com/rust-lang/async-book/issues/6#issuecomment-611703749
+        let body = hyper::body::to_bytes(response.body_mut()).await.unwrap();
+
+        let body_string = String::from_utf8(body.to_ascii_lowercase()).unwrap();
+
+        assert_eq!(response.status(), 201);
+        assert_eq!(
+            body_string,
+            "{\"code\":201,\"message\":\"flag test was created\"}".to_string()
+        );
     }
 }
