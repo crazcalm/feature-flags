@@ -35,8 +35,8 @@ jobs:
         run: cargo check
   test:
     name: Test
-    matrix:
-      strategy:
+    stategy:
+      matrix:
         os:
         - ubuntu-latest
         - windows-latest
