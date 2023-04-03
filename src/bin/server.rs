@@ -39,7 +39,7 @@ mod filters {
     /// All the Feature Flag filters combined.
     pub fn feature_flag_all_routes(
         db: DBLite,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         feature_flag_create(db.clone())
             .or(flags_list(db.clone()))
             .or(flags_update(db.clone()))
@@ -49,7 +49,7 @@ mod filters {
     /// GET flags
     pub fn flags_list(
         db: DBLite,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("flags")
             .and(warp::get())
             .and(with_db_lite(db))
@@ -59,7 +59,7 @@ mod filters {
     /// POST Feature Flag
     pub fn feature_flag_create(
         db: DBLite,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("flags")
             .and(warp::post())
             .and(json_flag_body())
@@ -69,7 +69,7 @@ mod filters {
 
     pub fn flags_update(
         db: DBLite,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("flags" / u64)
             .and(warp::put())
             .and(json_bool_body())
@@ -80,7 +80,7 @@ mod filters {
     /// DELETE
     pub fn flags_delete(
         db: DBLite,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("flags" / u64)
             .and(warp::delete())
             .and(with_db_lite(db))
