@@ -12,7 +12,7 @@ cargo tarpaulin
 ```
 
 ## Pre-Commit Hooks
-See [pre-commit website] for installation instructions.
+See [pre-commit website](https://pre-commit.com/) for installation instructions.
 
 ### Install hooks locally
 ```

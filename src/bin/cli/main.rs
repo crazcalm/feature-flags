@@ -1,98 +1,52 @@
 use std::io;
 
+use cli::{Cli, Commands};
+
 mod cli;
 mod subcommands;
 
+use clap::Parser;
 use feature_flags::db::get_db_rc;
 
-fn convert_string_to_sqlite_bool(value: &str) -> Option<i32> {
-    match value.trim().to_lowercase().as_str() {
-        "true" => Some(1),
-        "false" => Some(0),
-        _ => None,
+fn convert_bool_to_sqlite_bool(value: bool) -> i32 {
+    match value {
+        true => 1,
+        false => 0,
     }
 }
 
 fn main() {
-    let matches = cli::get_app().get_matches();
+    let cli_app = Cli::parse();
 
-    match matches.subcommand {
-        None => {
-            eprintln!("TODO: Show cli help")
-        }
-        Some(command) => match command.name.as_ref() {
-            "all" => {
-                let db = get_db_rc();
+    let db = get_db_rc();
+    let stdout = io::stdout();
+    let writer = stdout.lock();
 
-                let stdout = io::stdout();
-                let writer = stdout.lock();
-
+    match cli_app.command {
+        Commands::Get(args) => {
+            if let Some(name) = args.name {
+                subcommands::get_flags::get_flag(db, name, writer);
+            } else if args.all {
                 subcommands::all_flags::all_flags(db, writer);
             }
-            "create" => {
-                let name = command.matches.value_of("name").unwrap().to_string();
-                let value =
-                    convert_string_to_sqlite_bool(command.matches.value_of("bool").unwrap())
-                        .unwrap();
+        }
+        Commands::Create(args) => {
+            // All new flags are true
+            let value = convert_bool_to_sqlite_bool(true);
 
-                let stdout = io::stdout();
-                let writer = stdout.lock();
+            subcommands::create_flags::create_flag(db, args.name, value, writer);
+        }
+        Commands::Update(args) => {
+            let name = args.name;
+            let value = convert_bool_to_sqlite_bool(args.value.unwrap());
 
-                let db = get_db_rc();
-                subcommands::create_flags::create_flag(db, name, value, writer)
-            }
-            "update" => {
-                let name = command.matches.value_of("name").unwrap().to_string();
-                let value =
-                    convert_string_to_sqlite_bool(command.matches.value_of("bool").unwrap())
-                        .unwrap();
-
-                let db = get_db_rc();
-                let stdout = io::stdout();
-                let writer = stdout.lock();
-
-                subcommands::update_flags::update_flag(db, name, value, writer)
-            }
-            "get" => {
-                let name = command.matches.value_of("name").unwrap().to_string();
-
-                let db = get_db_rc();
-                let stdout = io::stdout();
-                let writer = stdout.lock();
-
-                subcommands::get_flags::get_flag(db, name, writer);
-            }
-            "delete" => {
-                let name = command.matches.value_of("name").unwrap().to_string();
-                let db = get_db_rc();
-                let stdout = io::stdout();
-                let writer = stdout.lock();
-
-                subcommands::delete_flags::delete_flag(db, name, writer);
-            }
-            _ => panic!("A subcommand was added to the cli but was not connected to the cli"),
-        },
+            subcommands::update_flags::update_flag(db, name, value, writer);
+        }
+        Commands::Delete(args) => {
+            subcommands::delete_flags::delete_flag(db, args.name, writer);
+        }
     };
 }
 
 #[cfg(test)]
-mod tests {
-    use super::convert_string_to_sqlite_bool;
-
-    #[test]
-    fn test_convert_string_to_sqlite_bool() {
-        let cases = vec![
-            ("true", Some(1)),
-            ("True", Some(1)),
-            ("  True  ", Some(1)),
-            ("false", Some(0)),
-            ("False", Some(0)),
-            ("  False  ", Some(0)),
-            ("something else", None),
-        ];
-
-        for (input, expected) in cases {
-            assert_eq!(convert_string_to_sqlite_bool(input), expected);
-        }
-    }
-}
+mod tests {}
