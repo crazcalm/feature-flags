@@ -45,7 +45,7 @@ pub fn get_db_server() -> DBLite {
 }
 
 pub fn initialize_db(conn: DBLocal) -> Result<(), FeatureFlagError> {
-    let result = conn.execute_batch(
+    conn.execute_batch(
         "DROP TABLE IF EXISTS flags;
 
         CREATE TABLE flags (
@@ -56,12 +56,12 @@ pub fn initialize_db(conn: DBLocal) -> Result<(), FeatureFlagError> {
         );",
     )?;
 
-    Ok(result)
+    Ok(())
 }
 
 pub async fn initialize_db_arc(conn_mutex: DBLite) -> Result<(), FeatureFlagError> {
     let conn = conn_mutex.lock().await;
-    let result = conn.execute_batch(
+    conn.execute_batch(
         "DROP TABLE IF EXISTS flags;
 
         CREATE TABLE flags (
@@ -72,7 +72,7 @@ pub async fn initialize_db_arc(conn_mutex: DBLite) -> Result<(), FeatureFlagErro
         );",
     )?;
 
-    Ok(result)
+    Ok(())
 }
 pub fn get_flag_by_name(conn: DBLocal, name: String) -> Result<FlagWithID, FeatureFlagError> {
     let result = conn.query_row(
